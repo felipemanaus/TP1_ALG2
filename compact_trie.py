@@ -227,7 +227,7 @@ class CompactTrie:
         # Percorre os filhos em uma ordem consistente (ordenado por chave)
         for char in sorted(node.children.keys()):
             child_node = node.children[char]
-            self.pre_order_serialize_serialize(child_node, file_handler)
+            self.pre_order_serialize(child_node, file_handler)
             
     def save_to_file(self, filename: str):
         """
@@ -236,7 +236,7 @@ class CompactTrie:
         print(f"Salvando índice para {filename}...")
         try:
             with open(filename, 'w', encoding='utf-8') as f:
-                self.pre_order_serialize_serialize(self.root, f)
+                self.pre_order_serialize(self.root, f)
             print("Salvamento concluído.")
         except Exception as e:
             print(f"Erro ao salvar o índice: {e}")
