@@ -210,107 +210,122 @@ class CompactTrie:
         else:
             return []
         
-def test_trie():
-    print("--- Iniciando Testes Extremos da CompactTrie ---")
-
-    # Funções de Auxílio
-    def insert_and_find(trie, word, doc_id, frequency):
-        trie.insert(word, doc_id, frequency)
-        result = trie.find(word)
-        expected = [(doc_id, frequency)]
+    def pre_order_serialize(self, node: TrieNode, file_handler):
+        """
+        Função auxiliar recursiva para serializar o nó e seus filhos em pré-ordem.
+        Formato de linha: 
+        <label>|<is_terminal (1/0)>|<num_children>|<inverted_index_string>
+        """
+        # Formata o índice invertido como uma string: "doc1,freq1;doc2,freq2;..."
+        index_str = ";".join([f"{doc},{freq}" for doc, freq in node.inverted_index])
         
-        # Para termos que já existem (e.g., Cenário 8), a lista de ocorrências será maior.
-        # Simplificamos a verificação para garantir que a nova ocorrência foi adicionada.
-        if (doc_id, frequency) in result:
-            print(f"  [SUCESSO] Inserção e Find de '{word}' (Doc {doc_id}) OK.")
-        else:
-            print(f"  [FALHA] Inserção de '{word}' (Doc {doc_id}) falhou. Esperado '{expected}', Obtido '{result}'.")
-
-    # ----------------------------------------------------
-    # Cenário 1: Colisão Total no Rótulo (Prefixo primeiro)
-    # ----------------------------------------------------
-    print("\n[Cenário 1] Prefixo de Termo Mais Longo (abc, abcd)")
-    trie1 = CompactTrie()
-    trie1.insert("abc", 1, 1)
-    insert_and_find(trie1, "abcd", 2, 1)
-    # Verifica a estrutura: O nó "abc" deve ter um filho "d".
-    # (Requer inspeção manual dos atributos ou um método de impressão da árvore para verificar a estrutura)
-    
-    # Verifica find
-    assert trie1.find("abc") == [(1, 1)], "Cenário 1: Find 'abc' falhou após inserção de 'abcd'."
-    assert trie1.find("abcd") == [(2, 1)], "Cenário 1: Find 'abcd' falhou."
-
-    # ----------------------------------------------------
-    # Cenário 2: Inserção Inversa (Termo mais longo primeiro)
-    # ----------------------------------------------------
-    print("\n[Cenário 2] Termo Mais Longo Primeiro (abcd, abc)")
-    trie2 = CompactTrie()
-    trie2.insert("abcd", 1, 1)
-    insert_and_find(trie2, "abc", 2, 1)
-    # Verifica a estrutura: Deve ter ocorrido um split no nó "abcd" para "abc". 
-    # "abc" deve ser terminal e ter um filho "d".
-    
-    # Verifica find
-    assert trie2.find("abcd") == [(1, 1)], "Cenário 2: Find 'abcd' falhou após split."
-    assert trie2.find("abc") == [(2, 1)], "Cenário 2: Find 'abc' falhou."
-
-    # ----------------------------------------------------
-    # Cenário 3: Colisão Parcial (Split Clássico)
-    # ----------------------------------------------------
-    print("\n[Cenário 3] Split Clássico (computador, compra)")
-    trie3 = CompactTrie()
-    trie3.insert("computador", 1, 1)
-    insert_and_find(trie3, "compra", 2, 1)
-    # Verifica a estrutura: Deve haver um nó intermediário "comp", com filhos "utador" e "ra".
-
-    # Verifica find
-    assert trie3.find("computador") == [(1, 1)], "Cenário 3: Find 'computador' falhou após split."
-    assert trie3.find("compra") == [(2, 1)], "Cenário 3: Find 'compra' falhou após split."
-
-    # ----------------------------------------------------
-    # Cenário 5: Triplo Split em Sequência
-    # ----------------------------------------------------
-    print("\n[Cenário 5] Triplo Split (computador, compra, comprimir)")
-    trie5 = CompactTrie()
-    trie5.insert("computador", 1, 1)
-    trie5.insert("compra", 2, 1) # Split 1 (cria nó 'comp')
-    insert_and_find(trie5, "comprimir", 3, 1) # Split 2 (adiciona 3º filho ao nó 'comp')
-    
-    # Verifica find
-    assert trie5.find("computador") == [(1, 1)], "Cenário 5: Find 'computador' falhou."
-    assert trie5.find("compra") == [(2, 1)], "Cenário 5: Find 'compra' falhou."
-    assert trie5.find("comprimir") == [(3, 1)], "Cenário 5: Find 'comprimir' falhou."
-    
-    # ----------------------------------------------------
-    # Cenário 8: Inserção de Termo Idêntico (Atualização de Índice)
-    # ----------------------------------------------------
-    print("\n[Cenário 8] Termo Idêntico (casa, casa - Doc 1 e Doc 5)")
-    trie8 = CompactTrie()
-    trie8.insert("casa", 1, 5) # 5 ocorrências no Doc 1
-    insert_and_find(trie8, "casa", 5, 2) # 2 ocorrências no Doc 5
-    
-    # Verifica find: Deve conter as duas ocorrências
-    expected_list = [(1, 5), (5, 2)]
-    result_list = trie8.find("casa")
-    assert all(item in result_list for item in expected_list) and len(result_list) == 2, \
-        f"Cenário 8: Atualização do índice falhou. Esperado {expected_list}, Obtido {result_list}."
-
-    # ----------------------------------------------------
-    # Cenário 9 & 10: Find em Prefixos Incompletos/Divergentes
-    # ----------------------------------------------------
-    print("\n[Cenário 9 & 10] Finds Falhos")
-    trie9 = CompactTrie()
-    trie9.insert("computador", 1, 1)
-
-    # Cenário 9: Busca que diverge dentro do rótulo ("compra" vs "computador")
-    assert trie9.find("compra") == [], "Cenário 9: Find 'compra' deveria falhar (divergência)."
-    print("  [SUCESSO] Find 'compra' falhou corretamente.")
-    
-    # Cenário 10: Busca que é prefixo, mas não é terminal ("comp" de "computador")
-    assert trie9.find("comp") == [], "Cenário 10: Find 'comp' deveria falhar (não terminal)."
-    print("  [SUCESSO] Find 'comp' falhou corretamente.")
-
-    print("\n--- Todos os testes extremos foram executados. ---")
+        # Formato de saída: label | is_terminal | num_children | index_data
+        line = f"{node.label}|{1 if node.is_terminal else 0}|{len(node.children)}|{index_str}\n"
         
+        file_handler.write(line)
         
-test_trie()
+        # Percorre os filhos em uma ordem consistente (ordenado por chave)
+        for char in sorted(node.children.keys()):
+            child_node = node.children[char]
+            self.pre_order_serialize_serialize(child_node, file_handler)
+            
+    def save_to_file(self, filename: str):
+        """
+        Persiste a CompactTrie em disco usando um formato de texto próprio.
+        """
+        print(f"Salvando índice para {filename}...")
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                self.pre_order_serialize_serialize(self.root, f)
+            print("Salvamento concluído.")
+        except Exception as e:
+            print(f"Erro ao salvar o índice: {e}")
+            
+    def load_from_file(self, filename: str):
+        """
+        Carrega a CompactTrie do disco, reconstruindo a estrutura em memória.
+        """
+        print(f"Carregando índice de {filename}...")
+        
+        # Lista de nós (tuplas: (nó pai, quantos filhos ainda faltam ler para ele))
+        stack = [] 
+        
+        # Recria a raiz
+        self.root = TrieNode()
+        current_node = self.root # Começamos a reconstruir a partir da raiz
+        
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                
+                # O primeiro nó lido SEMPRE é a raiz
+                first_line = f.readline()
+                if not first_line:
+                    return # Arquivo vazio
+                
+                # Processa a linha da raiz
+                label, is_terminal_str, num_children_str, index_str = first_line.strip().split('|')
+                
+                # A raiz tem label vazio e não é terminal (a menos que o corpus tenha uma palavra vazia)
+                self.root.label = label 
+                self.root.is_terminal = is_terminal_str == '1'
+                num_children = int(num_children_str)
+                
+                # Processa o índice invertido (se houver)
+                if index_str:
+                    for item in index_str.split(';'):
+                        doc_id, freq = map(int, item.split(','))
+                        self.root.inverted_index.append((doc_id, freq))
+                
+                if num_children > 0:
+                    stack.append((self.root, num_children))
+
+                # Processa os nós restantes
+                for line in f:
+                    # Se a pilha de pais estiver vazia, algo está errado na estrutura
+                    if not stack:
+                        break 
+                        
+                    # O nó que está sendo processado é filho do pai no topo da pilha
+                    parent_node, remaining_children = stack[-1] 
+                    
+                    # 1. Parsing da linha
+                    label, is_terminal_str, num_children_str, index_str = line.strip().split('|')
+                    
+                    # 2. Criação do novo nó
+                    new_node = TrieNode()
+                    new_node.label = label
+                    new_node.is_terminal = is_terminal_str == '1'
+                    new_node.children = {}
+                    new_node.inverted_index = []
+                    num_children = int(num_children_str)
+                    
+                    # 3. Processa o índice invertido
+                    if index_str:
+                        for item in index_str.split(';'):
+                            doc_id, freq = map(int, item.split(','))
+                            new_node.inverted_index.append((doc_id, freq))
+
+                    # 4. Reconecta na árvore
+                    # Liga o novo nó ao nó pai. A chave do 'children' é o primeiro caractere do rótulo
+                    parent_node.children[new_node.label[0]] = new_node
+                    
+                    # 5. Atualiza a pilha de pais
+                    remaining_children -= 1
+                    if remaining_children == 0:
+                        stack.pop() # Todos os filhos do pai foram lidos
+                    else:
+                        stack[-1] = (parent_node, remaining_children) # Atualiza a contagem
+                        
+                    # Se o novo nó tem filhos, ele se torna o próximo pai
+                    if num_children > 0:
+                        stack.append((new_node, num_children))
+                        
+            print("Carregamento concluído.")
+            return True
+            
+        except FileNotFoundError:
+            print(f"Arquivo {filename} não encontrado. Nenhuma Trie carregada.")
+            return False
+        except Exception as e:
+            print(f"Erro ao carregar ou desserializar o índice: {e}")
+            return False
