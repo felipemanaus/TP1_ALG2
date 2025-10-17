@@ -1,0 +1,21 @@
+# Arquivos de ambiente virtual do Python
+venv/
+env/
+
+# Arquivos de cache do Python
+__pycache__/
+*.pyc
+
+# Arquivos de índice gerados pela aplicação
+# Não devem ser versionados, pois são criados a partir do corpus
+*.json
+*.txt
+
+# Configurações do editor
+.vscode/
+
+# Sistema MacOS
+.DS_Store
+
+#Dados
+bbc
