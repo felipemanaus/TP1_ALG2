@@ -3,21 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Busca BBC News</title>
-    <!-- Um pouco de estilo para não ficar tão cru -->
+    <title>Borfe Search</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-        .search-bar { display: flex; gap: 10px; }
-        .search-bar input { flex-grow: 1; padding: 10px; font-size: 16px; }
-        .search-bar button { padding: 10px 15px; font-size: 16px; cursor: pointer; }
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Product+Sans:wght@700&display=swap');
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #ffffff;
+            color: #202124;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        /* ===== ESTILO DO LOGO "BORFE" ===== */
+        .logo {
+            font-family: 'Product Sans', sans-serif;
+            font-size: 8rem; /* Aumentei um pouco para dar mais impacto */
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: -4px;
+        }
+        /* Ordem das faixas do Jiu-Jitsu */
+        .logo span:nth-child(1) { color: #FFFFFF; text-shadow: 0 1px 4px rgba(0,0,0,0.6); } /* B - Branca (com sombra) */
+        .logo span:nth-child(2) { color: #0D6EFD; } /* o - Azul */
+        .logo span:nth-child(3) { color: #6f42c1; } /* r - Roxa */
+        .logo span:nth-child(4) { color: #654321; } /* f - Marrom */
+        .logo span:nth-child(5) { color: #212529; } /* e - Preta */
+
+        p {
+            color: #5f6368;
+            margin-bottom: 30px;
+        }
+        .search-bar-wrapper {
+            position: relative;
+        }
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9aa0a6;
+            width: 20px;
+            height: 20px;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 15px 20px 15px 50px;
+            font-size: 16px;
+            border: 1px solid #dfe1e5;
+            border-radius: 24px;
+            outline: none;
+            box-shadow: 0 1px 6px rgba(32,33,36,0.05);
+            transition: box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        .search-bar input:hover, .search-bar input:focus {
+            box-shadow: 0 1px 6px rgba(32,33,36,0.15);
+        }
+        .search-button {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background-color: #f8f9fa;
+            color: #3c4043;
+            border: 1px solid #f8f9fa;
+            border-radius: 4px;
+            transition: border-color 0.2s;
+        }
+        .search-button:hover {
+            border-color: #dadce0;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
-    <h1>Máquina de Busca - Corpus BBC News</h1>
-    <p>Use os operadores AND, OR e parêntesis () para refinar sua busca.</p>
-    <form action="/search" method="get" class="search-bar">
-        <input type="text" name="query" placeholder="Ex: (sport AND football) OR technology" required>
-        <button type="submit">Buscar</button>
-    </form>
+    <div class="container">
+        
+        <div class="logo">
+            <span>B</span><span>o</span><span>r</span><span>f</span><span>e</span>
+        </div>
+        
+        <p>Use os operadores AND, OR e parêntesis () para refinar sua busca.</p>
+
+        <form action="/search" method="get">
+            <div class="search-bar-wrapper">
+                <svg class="search-icon" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg>
+                <div class="search-bar">
+                    <input type="text" name="query" placeholder="Ex: (sport AND football) OR technology" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="search-button">Buscar</button>
+        </form>
+    </div>
 </body>
 </html>

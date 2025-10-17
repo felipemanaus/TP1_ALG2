@@ -1,9 +1,9 @@
 import os
 import json
+import re  # Importa o módulo de expressões regulares
 from flask import Flask, render_template, request
 
 # Importa o módulo de recuperação de informação
-# ALTERAÇÃO 1: Importamos OP_PRECEDENCE diretamente do módulo RI
 from RI import InformationRetriever, OP_PRECEDENCE
 
 # --- CONFIGURAÇÃO DA APLICAÇÃO ---
@@ -38,6 +38,8 @@ except Exception as e:
 def generate_snippet(doc_id, query_terms):
     """
     Gera um trecho de texto (snippet) de um documento, destacando o termo mais relevante.
+    Esta versão tenta encontrar uma ocorrência com 80+ caracteres de contexto prévio,
+    mas usa a primeira ocorrência como fallback.
     """
     relative_path = doc_map.get(doc_id)
     if not relative_path:
@@ -45,6 +47,7 @@ def generate_snippet(doc_id, query_terms):
     
     full_path = os.path.join(CORPUS_PATH, relative_path)
 
+    # Encontra o termo mais relevante para este documento específico
     most_relevant_term = ""
     highest_z_score = -float('inf')
 
@@ -71,10 +74,33 @@ def generate_snippet(doc_id, query_terms):
     except FileNotFoundError:
         return f"[Erro: Arquivo não encontrado em {full_path}]"
 
-    term_pos = content.lower().find(most_relevant_term.lower())
-    if term_pos == -1:
-        return content[:160] + "..."
+    # ================================================================= #
+    # LÓGICA DE BUSCA DE OCORRÊNCIA - ESTA PARTE FOI ATUALIZADA         #
+    # ================================================================= #
+    term_pos = -1
+    
+    # Encontra todas as ocorrências do termo (case-insensitive)
+    # re.escape garante que termos com caracteres especiais não quebrem a regex
+    matches = list(re.finditer(re.escape(most_relevant_term), content, re.IGNORECASE))
 
+    if not matches:
+        return content[:160] + "..." # Termo não encontrado (improvável)
+
+    # Tenta encontrar a primeira ocorrência que satisfaz a condição de 80 caracteres
+    for match in matches:
+        if match.start() >= 80:
+            term_pos = match.start()
+            break # Encontrou uma boa, para de procurar
+
+    # Se NENHUMA ocorrência satisfaz a condição, usa a primeira de todas como fallback
+    if term_pos == -1:
+        term_pos = matches[0].start()
+    # ================================================================= #
+    # FIM DA SEÇÃO ATUALIZADA                                           #
+    # ================================================================= #
+
+
+    # Extrai os 80 caracteres antes e depois, e destaca o termo
     start = max(0, term_pos - 80)
     end = min(len(content), term_pos + len(most_relevant_term) + 80)
     
@@ -114,7 +140,6 @@ def search():
         end_index = start_index + RESULTS_PER_PAGE
         paginated_ids = all_ranked_ids[start_index:end_index]
         
-        # ALTERAÇÃO 2: Usamos a variável OP_PRECEDENCE importada diretamente
         query_terms = {t for t in retriever._tokenize_query(query) if t not in OP_PRECEDENCE}
 
         for doc_id in paginated_ids:
