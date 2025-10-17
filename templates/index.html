@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Busca BBC News</title>
+    <!-- Um pouco de estilo para não ficar tão cru -->
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        .search-bar { display: flex; gap: 10px; }
+        .search-bar input { flex-grow: 1; padding: 10px; font-size: 16px; }
+        .search-bar button { padding: 10px 15px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Máquina de Busca - Corpus BBC News</h1>
+    <p>Use os operadores AND, OR e parêntesis () para refinar sua busca.</p>
+    <form action="/search" method="get" class="search-bar">
+        <input type="text" name="query" placeholder="Ex: (sport AND football) OR technology" required>
+        <button type="submit">Buscar</button>
+    </form>
+</body>
+</html>

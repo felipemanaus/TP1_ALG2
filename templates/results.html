@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados para "{{ query }}"</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        .result-item { margin-bottom: 25px; border-bottom: 1px solid #ccc; padding-bottom: 15px; }
+        .result-item h3 { margin: 0 0 5px 0; }
+        .result-item p { margin: 0; }
+        .result-path { color: #006621; font-size: 14px; }
+        mark { background-color: #ffda00; padding: 2px; }
+        .pagination { margin-top: 40px; text-align: center; }
+        .pagination a { text-decoration: none; padding: 8px 12px; border: 1px solid #ddd; margin: 0 4px; }
+        .pagination strong { padding: 8px 12px; border: 1px solid #000; background-color: #000; color: #fff; }
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Voltar para a busca</a>
+    <h1>Resultados para: "{{ query }}"</h1>
+    <p><i>{{ total_results }} documentos encontrados. Exibindo página {{ page }} de {{ total_pages }}.</i></p>
+    <hr>
+
+    <!-- Loop para exibir cada resultado -->
+    {% for result in results %}
+        <div class="result-item">
+            <!-- Mostra o caminho relativo do arquivo -->
+            <p class="result-path">{{ result.path }}</p>
+            <!-- Mostra o snippet gerado. O |safe é para o Flask renderizar o HTML (a tag <mark>) -->
+            <p>{{ result.snippet | safe }}</p>
+        </div>
+    {% else %}
+        <!-- Mensagem exibida se não houver resultados -->
+        <p>Nenhum resultado encontrado para a sua busca.</p>
+    {% endfor %}
+
+    <!-- Controles de paginação -->
+    {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+                <a href="/search?query={{ query }}&page={{ page - 1 }}">Anterior</a>
+            {% endif %}
+
+            <strong>{{ page }}</strong>
+
+            {% if page < total_pages %}
+                <a href="/search?query={{ query }}&page={{ page + 1 }}">Próxima</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</body>
+</html>
