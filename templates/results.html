@@ -69,31 +69,48 @@
             padding: 2px 1px;
             border-radius: 3px;
         }
-        .pagination {
-            margin-top: 40px;
-            text-align: center;
-        }
-        .pagination a, .pagination strong {
-            display: inline-block;
-            text-decoration: none;
-            padding: 8px 14px;
-            border: 1px solid #ddd;
-            margin: 0 4px;
-            border-radius: 6px;
-            font-weight: 500;
-            transition: background-color 0.2s, color 0.2s;
-        }
-        .pagination a:hover {
-            background-color: #f0f0f0;
-        }
-        .pagination strong {
-            background-color: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
         .no-results {
             text-align: center;
             padding: 40px 0;
+            color: #666;
+        }
+
+        /* ===== NOVO ESTILO PARA PAGINAÇÃO ===== */
+        .pagination {
+            margin-top: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+        }
+        .pagination a, .pagination span {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            min-width: 40px;
+            height: 40px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+            padding: 0 10px;
+        }
+        .pagination a {
+            color: #007bff;
+        }
+        .pagination a:hover {
+            background-color: #f0f2f5;
+            border-color: #ccc;
+        }
+        .pagination span.current { /* Estilo da página atual */
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+            font-weight: 700;
+        }
+        .pagination span.ellipsis { /* Estilo para "..." */
+            border: none;
             color: #666;
         }
     </style>
@@ -104,7 +121,9 @@
         
         <div class="header">
             <h1>Resultados para: "{{ query }}"</h1>
-            <p>{{ total_results }} documentos encontrados. Exibindo página {{ page }} de {{ total_pages }}.</p>
+            {% if total_results > 0 %}
+                <p>{{ total_results }} documentos encontrados. Exibindo página {{ page }} de {{ total_pages }}.</p>
+            {% endif %}
         </div>
 
         {% for result in results %}
@@ -116,16 +135,28 @@
             <p class="no-results">Nenhum resultado encontrado para a sua busca.</p>
         {% endfor %}
 
-        {% if total_pages > 1 %}
+        <!-- ===== NOVO COMPONENTE DE PAGINAÇÃO ===== -->
+        {% if pagination_range %}
             <div class="pagination">
+                <!-- Botão 'Anterior' -->
                 {% if page > 1 %}
-                    <a href="/search?query={{ query }}&page={{ page - 1 }}">Anterior</a>
+                    <a href="/search?query={{ query }}&page={{ page - 1 }}">&laquo; Anterior</a>
                 {% endif %}
 
-                <strong>{{ page }}</strong>
+                <!-- Números das páginas -->
+                {% for p in pagination_range %}
+                    {% if p == '...' %}
+                        <span class="ellipsis">...</span>
+                    {% elif p == page %}
+                        <span class="current">{{ p }}</span>
+                    {% else %}
+                        <a href="/search?query={{ query }}&page={{ p }}">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
 
+                <!-- Botão 'Próxima' -->
                 {% if page < total_pages %}
-                    <a href="/search?query={{ query }}&page={{ page + 1 }}">Próxima</a>
+                    <a href="/search?query={{ query }}&page={{ page + 1 }}">Próxima &raquo;</a>
                 {% endif %}
             </div>
         {% endif %}

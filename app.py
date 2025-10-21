@@ -1,9 +1,8 @@
 import os
 import json
-import re  # Importa o módulo de expressões regulares
+import re
+import string
 from flask import Flask, render_template, request
-
-# Importa o módulo de recuperação de informação
 from RI import InformationRetriever, OP_PRECEDENCE
 
 # --- CONFIGURAÇÃO DA APLICAÇÃO ---
@@ -33,21 +32,18 @@ except Exception as e:
     print(f"ERRO: Falha ao carregar o mapa de documentos: {e}")
 
 
-# --- FUNÇÃO AUXILIAR PARA GERAR SNIPPETS ---
+# --- FUNÇÕES AUXILIARES ---
 
 def generate_snippet(doc_id, query_terms):
     """
-    Gera um trecho de texto (snippet) de um documento, destacando o termo mais relevante.
-    Esta versão tenta encontrar uma ocorrência com 80+ caracteres de contexto prévio,
-    mas usa a primeira ocorrência como fallback.
+    Gera um snippet de texto. Retorna o snippet formatado se encontrar uma
+    ocorrência válida do termo, ou None caso contrário.
     """
     relative_path = doc_map.get(doc_id)
-    if not relative_path:
-        return "[Erro: Caminho do documento não encontrado no mapa]"
+    if not relative_path: return None
     
     full_path = os.path.join(CORPUS_PATH, relative_path)
 
-    # Encontra o termo mais relevante para este documento específico
     most_relevant_term = ""
     highest_z_score = -float('inf')
 
@@ -61,60 +57,78 @@ def generate_snippet(doc_id, query_terms):
                 highest_z_score = z_score
                 most_relevant_term = term
 
-    if not most_relevant_term:
-        try:
-            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return f.read(160) + "..."
-        except FileNotFoundError:
-            return f"[Erro: Arquivo não encontrado em {full_path}]"
+    if not most_relevant_term: return None
 
     try:
         with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
     except FileNotFoundError:
-        return f"[Erro: Arquivo não encontrado em {full_path}]"
+        return None
 
-    # ================================================================= #
-    # LÓGICA DE BUSCA DE OCORRÊNCIA - ESTA PARTE FOI ATUALIZADA         #
-    # ================================================================= #
-    term_pos = -1
+    best_match = None
     
-    # Encontra todas as ocorrências do termo (case-insensitive)
-    # re.escape garante que termos com caracteres especiais não quebrem a regex
-    matches = list(re.finditer(re.escape(most_relevant_term), content, re.IGNORECASE))
+    regex_pattern = r'\b' + re.escape(most_relevant_term) + r'\b'
+    matches = list(re.finditer(regex_pattern, content, re.IGNORECASE))
 
     if not matches:
-        return content[:160] + "..." # Termo não encontrado (improvável)
+        all_substring_matches = list(re.finditer(re.escape(most_relevant_term), content, re.IGNORECASE))
+        valid_matches = []
+        boundary_chars = string.whitespace + string.punctuation
+        for match in all_substring_matches:
+            start_index, end_index = match.start(), match.end()
+            is_start_boundary = (start_index == 0) or (content[start_index - 1] in boundary_chars)
+            is_end_boundary = (end_index == len(content)) or (content[end_index] in boundary_chars)
+            if is_start_boundary and is_end_boundary:
+                valid_matches.append(match)
+        matches = valid_matches
 
-    # Tenta encontrar a primeira ocorrência que satisfaz a condição de 80 caracteres
+    # ===== MUDANÇA IMPORTANTE AQUI =====
+    # Se, após todas as tentativas, não houver correspondências válidas, retorna None
+    if not matches:
+        return None
+
     for match in matches:
         if match.start() >= 80:
-            term_pos = match.start()
-            break # Encontrou uma boa, para de procurar
+            best_match = match
+            break 
+    if not best_match and matches:
+        best_match = matches[0]
+    
+    if not best_match:
+        return None
 
-    # Se NENHUMA ocorrência satisfaz a condição, usa a primeira de todas como fallback
-    if term_pos == -1:
-        term_pos = matches[0].start()
-    # ================================================================= #
-    # FIM DA SEÇÃO ATUALIZADA                                           #
-    # ================================================================= #
-
-
-    # Extrai os 80 caracteres antes e depois, e destaca o termo
+    term_pos = best_match.start()
+    term_in_doc = best_match.group(0) 
+    
     start = max(0, term_pos - 80)
-    end = min(len(content), term_pos + len(most_relevant_term) + 80)
+    end = min(len(content), term_pos + len(term_in_doc) + 80)
     
     prefix = content[start:term_pos]
-    term_in_doc = content[term_pos : term_pos + len(most_relevant_term)]
-    suffix = content[term_pos + len(most_relevant_term) : end]
-
-    if start > 0:
-        prefix = "..." + prefix
-    if end < len(content):
-        suffix = suffix + "..."
+    suffix = content[term_pos + len(term_in_doc) : end]
+    
+    if start > 0: prefix = "..." + prefix
+    if end < len(content): suffix = suffix + "..."
 
     return f"{prefix}<mark>{term_in_doc}</mark>{suffix}"
 
+def get_pagination_range(current_page, total_pages, window=2):
+    """Cria uma lista de números de página para exibir."""
+    if total_pages <= (2 * window + 5):
+        return range(1, total_pages + 1)
+    pages = []
+    if current_page > window + 2:
+        pages.extend([1, '...'])
+    start = max(1, current_page - window)
+    end = min(total_pages, current_page + window)
+    for i in range(start, end + 1):
+        if i not in pages:
+            pages.append(i)
+    if current_page < total_pages - window - 1:
+        if '...' not in pages:
+            pages.extend(['...', total_pages])
+        elif total_pages not in pages:
+             pages.append(total_pages)
+    return pages
 
 # --- ROTAS DA APLICAÇÃO WEB ---
 
@@ -130,24 +144,33 @@ def search():
     results_for_page = []
     total_pages = 0
     total_results = 0
+    pagination_range = []
 
     if query and retriever.is_ready:
         all_ranked_ids = retriever.search(query)
-        total_results = len(all_ranked_ids)
+        query_terms = {t for t in retriever._tokenize_query(query) if t not in OP_PRECEDENCE}
+        
+        # ===== MUDANÇA IMPORTANTE AQUI: FILTRAGEM DOS RESULTADOS =====
+        valid_results = []
+        for doc_id in all_ranked_ids:
+            snippet = generate_snippet(doc_id, query_terms)
+            # Só adiciona o resultado à lista se um snippet válido foi gerado
+            if snippet:
+                valid_results.append({
+                    'doc_id': doc_id,
+                    'path': doc_map.get(doc_id, "Caminho não encontrado"),
+                    'snippet': snippet
+                })
+        
+        total_results = len(valid_results)
         total_pages = (total_results + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE
         
         start_index = (page - 1) * RESULTS_PER_PAGE
         end_index = start_index + RESULTS_PER_PAGE
-        paginated_ids = all_ranked_ids[start_index:end_index]
+        results_for_page = valid_results[start_index:end_index]
         
-        query_terms = {t for t in retriever._tokenize_query(query) if t not in OP_PRECEDENCE}
-
-        for doc_id in paginated_ids:
-            results_for_page.append({
-                'doc_id': doc_id,
-                'path': doc_map.get(doc_id, "Caminho não encontrado"),
-                'snippet': generate_snippet(doc_id, query_terms)
-            })
+        if total_pages > 1:
+            pagination_range = get_pagination_range(page, total_pages)
 
     return render_template(
         'results.html',
@@ -155,7 +178,8 @@ def search():
         results=results_for_page,
         page=page,
         total_pages=total_pages,
-        total_results=total_results
+        total_results=total_results,
+        pagination_range=pagination_range
     )
 
 # --- EXECUÇÃO DA APLICAÇÃO ---
@@ -168,4 +192,3 @@ if __name__ == '__main__':
         print("="*60)
     else:
         app.run(debug=True)
-
