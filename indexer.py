@@ -59,8 +59,8 @@ class Indexer:
     def _tokenize_and_calculate_tf(self, text):
         """Converte o texto em tokens (limpeza básica) e calcula a Frequência do Termo (TF)."""
         text = text.lower()
-        # Encontra todas as sequências de letras minúsculas (a-z)
-        tokens = re.findall(r'[a-z]+', text)
+        # A nova regra [a-z0-9&-]+ permite letras, números, '&' e '-' dentro de uma palavra.
+        tokens = re.findall(r'[a-z0-9&-]+', text)
         
         term_frequency = defaultdict(int)
         for token in tokens:
@@ -172,42 +172,18 @@ class Indexer:
             json.dump(self.global_stats, f, indent=4)
         print(f"Estatísticas Z-score salvas em: {self.stats_file}")
 
-# --- Exemplo de Uso (Simulação) ---
+# --- Execução direta do script ---
 if __name__ == '__main__':
-    # ATENÇÃO: Substitua 'bbc-fulltext_simulacao' pelo nome exato da pasta raiz do corpus
+    # Define a pasta do corpus a ser indexada
     CORPUS_FOLDER = "bbc" 
-
-    # --- SIMULAÇÃO DE ESTRUTURA PARA TESTE ---
-    # Cria a estrutura de pastas e arquivos para que o script rode.
+    
+    # Verifica se a pasta do corpus existe
     if not os.path.exists(CORPUS_FOLDER):
-        print(f"Criando estrutura simulada para teste em: {CORPUS_FOLDER}")
-        os.makedirs(os.path.join(CORPUS_FOLDER, 'business'))
-        os.makedirs(os.path.join(CORPUS_FOLDER, 'tech'))
-        with open(os.path.join(CORPUS_FOLDER, 'business', '001.txt'), 'w') as f: f.write("O carro é azul. O carro corre.") 
-        with open(os.path.join(CORPUS_FOLDER, 'business', '002.txt'), 'w') as f: f.write("Um carro verde.") 
-        with open(os.path.join(CORPUS_FOLDER, 'tech', '003.txt'), 'w') as f: f.write("Carro rápido e carro lento.") 
-        
-    # --- EXECUÇÃO DO INDEXADOR ---
-    indexer = Indexer(corpus_path=CORPUS_FOLDER)
-    indexer.index_corpus()
-    
-    print("\n--- Verificação de Estatísticas Salvas (Termo 'carro') ---")
-    
-    # Recarrega as estatísticas salvas para provar que a persistência funcionou
-    try:
-        with open("global_stats.json", 'r', encoding='utf-8') as f:
-            saved_stats = json.load(f)
-            stats_carro = saved_stats.get('carro', {})
-            
-            if stats_carro:
-                mu = stats_carro['mu']
-                sigma = stats_carro['sigma']
-                print(f"Média (Mu) Salva: {mu:.2f}")
-                print(f"Desvio-Padrão (Sigma) Salvo: {sigma:.2f}")
-                
-                # Exemplo de Cálculo Z-score para Doc 1 (TF=2) usando estatísticas salvas:
-                z_score_doc1 = (2 - mu) / sigma if sigma > 0 else 0
-                print(f"Z-score de 'carro' no Doc 1 (TF=2): {z_score_doc1:.2f}")
-
-    except Exception as e:
-        print(f"Falha ao ler o arquivo de estatísticas: {e}")
+        print(f"ERRO: A pasta do corpus '{CORPUS_FOLDER}' não foi encontrada.")
+        print("Por favor, baixe e extraia o corpus para a pasta do projeto.")
+    else:
+        # Cria uma instância do indexador e executa o processo de indexação
+        print("--- INICIANDO PROCESSO DE INDEXAÇÃO MANUAL ---")
+        indexer = Indexer(corpus_path=CORPUS_FOLDER)
+        indexer.index_corpus()
+        print("\n--- PROCESSO DE INDEXAÇÃO MANUAL CONCLUÍDO ---")
