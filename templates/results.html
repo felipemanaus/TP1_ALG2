@@ -75,7 +75,7 @@
             color: #666;
         }
 
-        /* ===== NOVO ESTILO PARA PAGINAÇÃO ===== */
+        /* ===== ESTILO PARA PAGINAÇÃO ===== */
         .pagination {
             margin-top: 40px;
             display: flex;
@@ -88,13 +88,16 @@
             align-items: center;
             justify-content: center;
             text-decoration: none;
-            min-width: 40px;
-            height: 40px;
+            /* ===== MUDANÇAS SUTIS AQUI ===== */
+            min-width: 36px;  /* De 40px para 36px */
+            height: 36px;       /* De 40px para 36px */
+            padding: 0 12px;    /* Ajuste no preenchimento horizontal */
+            font-size: 14px;    /* Mantém a fonte menor */
+            /* ============================== */
             border: 1px solid #ddd;
             border-radius: 6px;
             font-weight: 500;
             transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-            padding: 0 10px;
         }
         .pagination a {
             color: #007bff;
@@ -103,13 +106,13 @@
             background-color: #f0f2f5;
             border-color: #ccc;
         }
-        .pagination span.current { /* Estilo da página atual */
+        .pagination span.current {
             background-color: #007bff;
             color: white;
             border-color: #007bff;
             font-weight: 700;
         }
-        .pagination span.ellipsis { /* Estilo para "..." */
+        .pagination span.ellipsis {
             border: none;
             color: #666;
         }
@@ -135,15 +138,13 @@
             <p class="no-results">Nenhum resultado encontrado para a sua busca.</p>
         {% endfor %}
 
-        <!-- ===== NOVO COMPONENTE DE PAGINAÇÃO ===== -->
+        <!-- ===== COMPONENTE DE PAGINAÇÃO ===== -->
         {% if pagination_range %}
             <div class="pagination">
-                <!-- Botão 'Anterior' -->
                 {% if page > 1 %}
                     <a href="/search?query={{ query }}&page={{ page - 1 }}">&laquo; Anterior</a>
                 {% endif %}
 
-                <!-- Números das páginas -->
                 {% for p in pagination_range %}
                     {% if p == '...' %}
                         <span class="ellipsis">...</span>
@@ -154,7 +155,6 @@
                     {% endif %}
                 {% endfor %}
 
-                <!-- Botão 'Próxima' -->
                 {% if page < total_pages %}
                     <a href="/search?query={{ query }}&page={{ page + 1 }}">Próxima &raquo;</a>
                 {% endif %}
