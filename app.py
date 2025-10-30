@@ -18,7 +18,6 @@ RESULTS_PER_PAGE = 10
 app = Flask(__name__)
 
 # --- CARREGAMENTO DOS DADOS ---
-# A lógica de carregamento dos dados permanece a mesma
 print("Carregando o módulo de Recuperação de Informação...")
 retriever = InformationRetriever(trie_file=TRIE_FILE, stats_file=STATS_FILE)
 print("Módulo carregado com sucesso.")
@@ -37,7 +36,6 @@ except Exception as e:
 
 
 # --- FUNÇÕES AUXILIARES ---
-# Nenhuma mudança nas funções auxiliares, elas permanecem as mesmas
 def generate_snippet(doc_id, query_terms):
     """
     Gera um snippet de texto. Retorna o snippet formatado se encontrar uma
@@ -69,9 +67,12 @@ def generate_snippet(doc_id, query_terms):
     if not most_relevant_term: return None
 
     best_match = None
+    
+    # 1. Primeira tentativa: buscar por palavra inteira.
     regex_pattern = r'\b' + re.escape(most_relevant_term) + r'\b'
     matches = list(re.finditer(regex_pattern, content, re.IGNORECASE))
 
+    # 2. Se a primeira tentativa falhar, usa o fallback inteligente.
     if not matches:
         all_substring_matches = list(re.finditer(re.escape(most_relevant_term), content, re.IGNORECASE))
         valid_matches = []
@@ -84,8 +85,36 @@ def generate_snippet(doc_id, query_terms):
                 valid_matches.append(match)
         matches = valid_matches
 
-    if not matches: return None
+    if not matches: return None # Se não há correspondências, retorna None
 
+    # ===== MUDANÇA IMPORTANTE AQUI: FILTRO DE REGRAS ESPECIAIS =====
+    # Aplica as regras de apóstrofo DEPOIS de encontrar as correspondências.
+    
+    filtered_matches = []
+    for match in matches:
+        start_index = match.start()
+        end_index = match.end()
+        char_before = content[start_index - 1] if start_index > 0 else ' '
+        char_after = content[end_index] if end_index < len(content) else ' '
+
+        # REGRA PARA 't': Barrar sempre se estiver com apóstrofo (ex: "don't", "can't")
+        if most_relevant_term == 't' and (char_before == "'" or char_after == "'"):
+            continue # Pula, não é uma correspondência válida
+
+        # REGRA PARA 'd': Barrar se for 'D'Arcy' (antes do apóstrofo)
+        if most_relevant_term == 'd' and char_after == "'":
+            continue # Pula, não é uma correspondência válida
+        
+        # Se passou pelos filtros, é uma correspondência válida
+        filtered_matches.append(match)
+    
+    # Atualiza a lista de matches para conter apenas as correspondências filtradas
+    matches = filtered_matches
+    # =================================================================
+
+    if not matches: return None # Se todas as correspondências foram filtradas, retorna None
+
+    # Tenta encontrar a primeira ocorrência que satisfaz a condição de 80 caracteres.
     for match in matches:
         if match.start() >= 80:
             best_match = match
@@ -100,10 +129,13 @@ def generate_snippet(doc_id, query_terms):
     
     start = max(0, term_pos - 80)
     end = min(len(content), term_pos + len(term_in_doc) + 80)
+    
     prefix = content[start:term_pos]
     suffix = content[term_pos + len(term_in_doc) : end]
+    
     if start > 0: prefix = "..." + prefix
     if end < len(content): suffix = suffix + "..."
+
     return f"{prefix}<mark>{term_in_doc}</mark>{suffix}"
 
 def get_pagination_range(current_page, total_pages, window=2):
@@ -121,7 +153,6 @@ def get_pagination_range(current_page, total_pages, window=2):
     return pages
 
 # --- ROTAS DA APLICAÇÃO WEB ---
-# Nenhuma mudança nas rotas, elas permanecem as mesmas
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -170,7 +201,6 @@ def search():
 # --- EXECUÇÃO DA APLICAÇÃO ---
 
 if __name__ == '__main__':
-    # ===== MUDANÇA IMPORTANTE AQUI: LÓGICA DE EXECUÇÃO AUTOMÁTICA =====
     
     # 1. Verifica se os arquivos de índice existem.
     if not all(os.path.exists(f) for f in [TRIE_FILE, STATS_FILE, MAP_FILE]):
@@ -193,6 +223,4 @@ if __name__ == '__main__':
             exit() # Aborta a execução se a indexação falhar.
 
     # 3. Inicia o servidor web do Flask.
-    # O `debug=True` garante que, após a indexação, o servidor reinicie
-    # e recarregue os módulos com os dados corretos.
     app.run(debug=True)

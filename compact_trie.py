@@ -66,12 +66,11 @@ class CompactTrie:
             
             # ----------------------------------------------------
             # A. Match Exato: Word == child_label
-            # Este é o caso que causava o erro no Cenário 8.
             # ----------------------------------------------------
             if mismatch_idx == len(remaining_word) and mismatch_idx == len(child_label):
                 # A palavra já existe no caminho do nó. Apenas atualiza o índice.
                 
-                # Marca como terminal (caso não estivesse, se foi o resultado de um split)
+                # Marca como terminal
                 child_node.is_terminal = True 
                 
                 # Adiciona o novo DocID e Frequência
@@ -80,7 +79,6 @@ class CompactTrie:
             
             # ----------------------------------------------------
             # B. Word é Prefixo de Rótulo: (Word é mais curta que o rótulo)
-            # Ex: Inserindo "car" e o nó é "cartoon". (mismatch_idx < len(child_label))
             # ----------------------------------------------------
             elif mismatch_idx == len(remaining_word):
                 
@@ -103,7 +101,6 @@ class CompactTrie:
             
             # ----------------------------------------------------
             # C. Rótulo é Prefixo de Word: (Word é mais longa que o rótulo)
-            # Ex: Inserindo "cartoon" e o nó é "car".
             # ----------------------------------------------------
             elif mismatch_idx == len(child_label):
                 
@@ -142,69 +139,36 @@ class CompactTrie:
     def find(self, word: str) -> list:
         """
         Busca uma palavra na Trie Compacta.
-        Retorna a lista de ocorrências (o índice invertido) se a palavra for encontrada,
-        ou uma lista vazia caso contrário.
-        
-        A lista de ocorrências tem o formato: [(DocID, Frequência), ...]
         """
         current_node = self.root
         remaining_word = word
         
         while remaining_word:
-            # Encontra o primeiro caractere da palavra restante
             char = remaining_word[0]
             
-            # 1. Se o caractere não estiver nos filhos, a palavra não existe na Trie
             if char not in current_node.children:
                 return []
             
-            # Pega o nó filho (candidato) e seu rótulo
             child_node = current_node.children[char]
             child_label = child_node.label
             
-            # 2. Verifica o ponto de concordância (prefixo comum)
             mismatch_idx = self._find_mismatch_point(remaining_word, child_label)
             
             if mismatch_idx == len(remaining_word):
-                # Caso A: A palavra inteira foi consumida.
-                # Ex: Busca por "car" em um nó com label "cartoon". Mismatch é 3.
-                
-                # Se o prefixo comum for exatamente igual ao tamanho da palavra que sobrou,
-                # significa que a palavra que procuramos está *contida* no rótulo.
-                # Como a Trie Compacta pode ter divisões (splits), o nó que representa 
-                # a palavra completa deve ser o nó pai do split ou um nó terminal.
-                
                 if mismatch_idx == len(child_label):
-                    # Se o prefixo comum é igual ao label inteiro, passamos para o próximo nó.
-                    # Mas se a palavra a ser buscada foi inteira, isso só ocorre se 
-                    # a palavra for um termo terminal no nó atual.
                     current_node = child_node
-                    remaining_word = "" # Força saída do loop
+                    remaining_word = "" 
                     break
                 
-                # Se a palavra é um prefixo estrito do rótulo do nó (ex: "car" de "cartoon"),
-                # ela só seria um termo se um nó terminal já tivesse sido inserido 
-                # naquele ponto exato no histórico de inserções, o que resultaria
-                # em um split.
-                # Portanto, se a busca termina aqui e não consumiu o rótulo inteiro,
-                # a palavra não existe como termo.
                 return []
 
             elif mismatch_idx == len(child_label):
-                # Caso B: O rótulo do nó foi completamente consumido.
-                # Ex: Nó com label "comp", buscando "computador". Mismatch é 4.
-                # Continuamos a busca a partir do nó filho com o restante da palavra.
                 current_node = child_node
                 remaining_word = remaining_word[mismatch_idx:]
                 
             else: 
-                # Caso C: Há um prefixo comum, mas a palavra restante E o rótulo do nó
-                # ainda possuem partes.
-                # Ex: Nó com label "computador", buscando "compra". Mismatch é 4.
-                # A palavra não existe, pois a continuação é "ra" e o nó exige "utador".
                 return []
         
-        # O loop terminou. Verificamos se o nó atual é terminal (representa uma palavra completa).
         if current_node.is_terminal:
             return current_node.inverted_index
         else:
@@ -213,18 +177,13 @@ class CompactTrie:
     def pre_order_serialize(self, node: TrieNode, file_handler):
         """
         Função auxiliar recursiva para serializar o nó e seus filhos em pré-ordem.
-        Formato de linha: 
-        <label>|<is_terminal (1/0)>|<num_children>|<inverted_index_string>
         """
-        # Formata o índice invertido como uma string: "doc1,freq1;doc2,freq2;..."
         index_str = ";".join([f"{doc},{freq}" for doc, freq in node.inverted_index])
         
-        # Formato de saída: label | is_terminal | num_children | index_data
         line = f"{node.label}|{1 if node.is_terminal else 0}|{len(node.children)}|{index_str}\n"
         
         file_handler.write(line)
         
-        # Percorre os filhos em uma ordem consistente (ordenado por chave)
         for char in sorted(node.children.keys()):
             child_node = node.children[char]
             self.pre_order_serialize(child_node, file_handler)
@@ -247,30 +206,23 @@ class CompactTrie:
         """
         print(f"Carregando índice de {filename}...")
         
-        # Lista de nós (tuplas: (nó pai, quantos filhos ainda faltam ler para ele))
         stack = [] 
         
-        # Recria a raiz
         self.root = TrieNode()
-        current_node = self.root # Começamos a reconstruir a partir da raiz
         
         try:
             with open(filename, 'r', encoding='utf-8') as f:
                 
-                # O primeiro nó lido SEMPRE é a raiz
                 first_line = f.readline()
                 if not first_line:
-                    return # Arquivo vazio
+                    return False # Arquivo vazio
                 
-                # Processa a linha da raiz
                 label, is_terminal_str, num_children_str, index_str = first_line.strip().split('|')
                 
-                # A raiz tem label vazio e não é terminal (a menos que o corpus tenha uma palavra vazia)
                 self.root.label = label 
                 self.root.is_terminal = is_terminal_str == '1'
                 num_children = int(num_children_str)
                 
-                # Processa o índice invertido (se houver)
                 if index_str:
                     for item in index_str.split(';'):
                         doc_id, freq = map(int, item.split(','))
@@ -279,19 +231,14 @@ class CompactTrie:
                 if num_children > 0:
                     stack.append((self.root, num_children))
 
-                # Processa os nós restantes
                 for line in f:
-                    # Se a pilha de pais estiver vazia, algo está errado na estrutura
                     if not stack:
                         break 
                         
-                    # O nó que está sendo processado é filho do pai no topo da pilha
                     parent_node, remaining_children = stack[-1] 
                     
-                    # 1. Parsing da linha
                     label, is_terminal_str, num_children_str, index_str = line.strip().split('|')
                     
-                    # 2. Criação do novo nó
                     new_node = TrieNode()
                     new_node.label = label
                     new_node.is_terminal = is_terminal_str == '1'
@@ -299,24 +246,19 @@ class CompactTrie:
                     new_node.inverted_index = []
                     num_children = int(num_children_str)
                     
-                    # 3. Processa o índice invertido
                     if index_str:
                         for item in index_str.split(';'):
                             doc_id, freq = map(int, item.split(','))
                             new_node.inverted_index.append((doc_id, freq))
 
-                    # 4. Reconecta na árvore
-                    # Liga o novo nó ao nó pai. A chave do 'children' é o primeiro caractere do rótulo
                     parent_node.children[new_node.label[0]] = new_node
                     
-                    # 5. Atualiza a pilha de pais
                     remaining_children -= 1
                     if remaining_children == 0:
-                        stack.pop() # Todos os filhos do pai foram lidos
+                        stack.pop()
                     else:
-                        stack[-1] = (parent_node, remaining_children) # Atualiza a contagem
+                        stack[-1] = (parent_node, remaining_children)
                         
-                    # Se o novo nó tem filhos, ele se torna o próximo pai
                     if num_children > 0:
                         stack.append((new_node, num_children))
                         
