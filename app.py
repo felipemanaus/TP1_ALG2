@@ -38,16 +38,19 @@ except Exception as e:
 # --- FUNÇÕES AUXILIARES ---
 def generate_snippet(doc_id, query_terms):
     """
-    Gera um snippet de texto. Retorna o snippet formatado se encontrar uma
-    ocorrência válida do termo, ou None caso contrário.
+    Gera um snippet de texto. Retorna uma tupla (título, snippet_formatado)
+    se encontrar uma ocorrência válida, ou None caso contrário.
     """
     relative_path = doc_map.get(doc_id)
     if not relative_path: return None
     
     full_path = os.path.join(CORPUS_PATH, relative_path)
+    
     try:
         with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
+            title = f.readline().strip()
+            if not title: return None
+            content = title + "\n" + f.read()
     except FileNotFoundError:
         return None
 
@@ -68,53 +71,46 @@ def generate_snippet(doc_id, query_terms):
 
     best_match = None
     
-    # 1. Primeira tentativa: buscar por palavra inteira.
     regex_pattern = r'\b' + re.escape(most_relevant_term) + r'\b'
     matches = list(re.finditer(regex_pattern, content, re.IGNORECASE))
 
-    # 2. Se a primeira tentativa falhar, usa o fallback inteligente.
     if not matches:
         all_substring_matches = list(re.finditer(re.escape(most_relevant_term), content, re.IGNORECASE))
         valid_matches = []
         boundary_chars = string.whitespace + string.punctuation
         for match in all_substring_matches:
             start_index, end_index = match.start(), match.end()
-            is_start_boundary = (start_index == 0) or (content[start_index - 1] in boundary_chars)
-            is_end_boundary = (end_index == len(content)) or (content[end_index] in boundary_chars)
+            char_before = content[start_index - 1] if start_index > 0 else ' '
+            is_start_boundary = (start_index == 0) or (char_before in boundary_chars)
+            char_after = content[end_index] if end_index < len(content) else ' '
+            is_end_boundary = (end_index == len(content)) or (char_after in boundary_chars)
+            
             if is_start_boundary and is_end_boundary:
+                if most_relevant_term == 't' and (char_before == "'" or char_after == "'"):
+                    continue
+                if most_relevant_term == 'd' and char_after == "'":
+                    continue
                 valid_matches.append(match)
         matches = valid_matches
 
-    if not matches: return None # Se não há correspondências, retorna None
+    if not matches: return None
 
-    # ===== MUDANÇA IMPORTANTE AQUI: FILTRO DE REGRAS ESPECIAIS =====
-    # Aplica as regras de apóstrofo DEPOIS de encontrar as correspondências.
-    
     filtered_matches = []
     for match in matches:
         start_index = match.start()
         end_index = match.end()
         char_before = content[start_index - 1] if start_index > 0 else ' '
         char_after = content[end_index] if end_index < len(content) else ' '
-
-        # REGRA PARA 't': Barrar sempre se estiver com apóstrofo (ex: "don't", "can't")
         if most_relevant_term == 't' and (char_before == "'" or char_after == "'"):
-            continue # Pula, não é uma correspondência válida
-
-        # REGRA PARA 'd': Barrar se for 'D'Arcy' (antes do apóstrofo)
+            continue
         if most_relevant_term == 'd' and char_after == "'":
-            continue # Pula, não é uma correspondência válida
-        
-        # Se passou pelos filtros, é uma correspondência válida
+            continue
         filtered_matches.append(match)
     
-    # Atualiza a lista de matches para conter apenas as correspondências filtradas
     matches = filtered_matches
-    # =================================================================
 
-    if not matches: return None # Se todas as correspondências foram filtradas, retorna None
+    if not matches: return None
 
-    # Tenta encontrar a primeira ocorrência que satisfaz a condição de 80 caracteres.
     for match in matches:
         if match.start() >= 80:
             best_match = match
@@ -136,7 +132,8 @@ def generate_snippet(doc_id, query_terms):
     if start > 0: prefix = "..." + prefix
     if end < len(content): suffix = suffix + "..."
 
-    return f"{prefix}<mark>{term_in_doc}</mark>{suffix}"
+    snippet_string = f"{prefix}<mark>{term_in_doc}</mark>{suffix}"
+    return title, snippet_string
 
 def get_pagination_range(current_page, total_pages, window=2):
     """Cria uma lista de números de página para exibir."""
@@ -170,11 +167,12 @@ def search():
         
         valid_results = []
         for doc_id in all_ranked_ids:
-            snippet = generate_snippet(doc_id, query_terms)
-            if snippet:
+            snippet_data = generate_snippet(doc_id, query_terms)
+            if snippet_data:
+                title, snippet = snippet_data
                 valid_results.append({
-                    'doc_id': doc_id,
-                    'path': doc_map.get(doc_id, "Caminho não encontrado"),
+                    'doc_id': doc_id, # ===== MUDANÇA: Passando o doc_id para o template =====
+                    'title': title,
                     'snippet': snippet
                 })
         
@@ -198,11 +196,34 @@ def search():
         pagination_range=pagination_range
     )
 
+# ===== NOVA ROTA ADICIONADA AQUI =====
+@app.route('/document/<int:doc_id>')
+def show_document(doc_id):
+    """Exibe o conteúdo completo de um documento."""
+    
+    # 1. Encontra o caminho do arquivo usando o doc_map
+    relative_path = doc_map.get(doc_id)
+    if not relative_path:
+        return render_template('document.html', title="Erro", body="Documento não encontrado.")
+
+    full_path = os.path.join(CORPUS_PATH, relative_path)
+
+    # 2. Lê o título e o corpo do arquivo
+    try:
+        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+            title = f.readline().strip()
+            body = f.read()
+    except FileNotFoundError:
+        return render_template('document.html', title="Erro", body=f"Arquivo {full_path} não encontrado.")
+    
+    # 3. Renderiza o novo template com o conteúdo
+    return render_template('document.html', title=title, body=body)
+# ========================================
+
 # --- EXECUÇÃO DA APLICAÇÃO ---
 
 if __name__ == '__main__':
     
-    # 1. Verifica se os arquivos de índice existem.
     if not all(os.path.exists(f) for f in [TRIE_FILE, STATS_FILE, MAP_FILE]):
         print("="*60)
         print("ATENÇÃO: Arquivos de índice não encontrados.")
@@ -211,7 +232,6 @@ if __name__ == '__main__':
         print("="*60)
         
         try:
-            # 2. Se não existirem, cria uma instância do Indexer e executa.
             indexer = Indexer(corpus_path=CORPUS_PATH, trie_file=TRIE_FILE, map_file=MAP_FILE, stats_file=STATS_FILE)
             indexer.index_corpus()
             print("\nIndexação concluída com sucesso!")
@@ -220,7 +240,6 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"\nERRO CRÍTICO durante a indexação: {e}")
             print("Verifique se a pasta do corpus ('bbc') está no lugar correto.")
-            exit() # Aborta a execução se a indexação falhar.
+            exit() 
 
-    # 3. Inicia o servidor web do Flask.
     app.run(debug=True)
